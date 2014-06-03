@@ -19,6 +19,7 @@ package directives
 
 import java.lang.IllegalStateException
 import shapeless._
+import ops.hlist._
 
 trait ParameterDirectives extends ToNameReceptaclePimps {
 
@@ -80,10 +81,21 @@ trait ParamDefMagnet2[T] {
   def apply(value: T): Out
 }
 
-object ParamDefMagnet2 {
+trait LowLevelParamDefMagnet2 {
   type ParamDefMagnetAux[A, B] = ParamDefMagnet2[A] { type Out = B }
   def ParamDefMagnetAux[A, B](f: A ⇒ B) = new ParamDefMagnet2[A] { type Out = B; def apply(value: A) = f(value) }
 
+  /************ HList/tuple support ******************/
+  implicit def forHList[T, L <: HList](implicit hla: Generic.Aux[T, L], f: LeftFolder[L, Directive0, MapReduce.type]) =
+    ParamDefMagnetAux[T, f.Out](t ⇒ hla.to(t).foldLeft(BasicDirectives.noop)(MapReduce))
+
+  object MapReduce extends Poly2 {
+    implicit def from[T, LA <: HList, LB <: HList, Out <: HList](implicit pdma: ParamDefMagnetAux[T, Directive[LB]], ev: Prepend.Aux[LA, LB, Out]) =
+      at[Directive[LA], T] { (a, t) ⇒ a & pdma(t) }
+  }
+}
+
+object ParamDefMagnet2 extends LowLevelParamDefMagnet2 {
   import spray.httpx.unmarshalling.{ FromStringOptionDeserializer ⇒ FSOD, _ }
   import BasicDirectives._
   import RouteDirectives._
@@ -129,20 +141,5 @@ object ParamDefMagnet2 {
   }
   implicit def forRVDR[T] = ParamDefMagnetAux[RequiredValueDeserializerReceptacle[T], Directive0] { rvr ⇒
     requiredFilter(rvr.name, rvr.deserializer, rvr.requiredValue)
-  }
-
-  /************ tuple support ******************/
-
-  implicit def forTuple[T <: Product, L <: HList, Out0](implicit hla: HListerAux[T, L], pdma: ParamDefMagnetAux[L, Out0]) =
-    ParamDefMagnetAux[T, Out0](tuple ⇒ pdma(hla(tuple)))
-
-  /************ HList support ******************/
-
-  implicit def forHList[L <: HList](implicit f: LeftFolder[L, Directive0, MapReduce.type]) =
-    ParamDefMagnetAux[L, f.Out](_.foldLeft(BasicDirectives.noop)(MapReduce))
-
-  object MapReduce extends Poly2 {
-    implicit def from[T, LA <: HList, LB <: HList, Out <: HList](implicit pdma: ParamDefMagnetAux[T, Directive[LB]], ev: PrependAux[LA, LB, Out]) =
-      at[Directive[LA], T] { (a, t) ⇒ a & pdma(t) }
   }
 }
