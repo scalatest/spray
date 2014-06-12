@@ -95,7 +95,7 @@ trait RouteResultComponent {
         _rejections.foreach {
           RejectionHandler.applyTransformations(_) match {
             case Nil ⇒ failTestAt("Request was not handled", 2)
-            case r   ⇒ failTest("Request was rejected with " + r)
+            case r   ⇒ failTestAt("Request was rejected with " + r, 2)
           }
         }
         failNotCompletedNotRejected()

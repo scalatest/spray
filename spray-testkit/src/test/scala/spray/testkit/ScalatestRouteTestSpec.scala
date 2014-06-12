@@ -123,6 +123,28 @@ class ScalatestRouteTestSpec extends FreeSpec with MustMatchers with Directives 
           }
         } must have('failedCodeLineNumber(Some(thisLineNumber - 2)))
       }
+
+      "when a request that was expected to be rejected was not rejected" in {
+        the[TestFailedException] thrownBy {
+          Get("/testing") ~> testRoute ~> check {
+            // The call to "rejections" should blow up because GET /testing is a good request
+            rejections must have size 1
+          }
+        } must have('failedCodeLineNumber(Some(thisLineNumber - 2)))
+      }
+
+      "when a request was rejected with a list of somethings" in {
+        the[TestFailedException] thrownBy {
+          Post("/testing") ~> testRoute ~> check {
+            // The call to "responseAs" should blow up because POST /testing is a bad request (wrong method, only GET supported)
+            responseAs[String] must include("1, 2, 3")
+          }
+        } must have('failedCodeLineNumber(Some(thisLineNumber - 2)))
+      }
+
+      "when a route is completed/rejected more than once" is pending // saveResult method
+
+      "when a request times out" is pending // failNotCompletedNotRejected method
     }
   }
 }
