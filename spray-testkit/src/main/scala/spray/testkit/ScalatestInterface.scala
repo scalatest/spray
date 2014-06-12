@@ -22,7 +22,8 @@ import org.scalatest.{ Suite, BeforeAndAfterAll }
 trait ScalatestInterface extends TestFrameworkInterface with BeforeAndAfterAll {
   this: Suite ⇒
 
-  def failTest(msg: String) = throw new TestFailedException(msg, 11)
+  def failTest(msg: String): Nothing = throw new TestFailedException(msg, 11)
+  def failTestAt(msg: String, stackDepthAdjustment: Int): Nothing = throw new TestFailedException(msg, 11 + stackDepthAdjustment)
 
   abstract override protected def afterAll(): Unit = {
     cleanUp()

@@ -21,4 +21,5 @@ trait TestFrameworkInterface {
   def cleanUp()
 
   def failTest(msg: String): Nothing
+  def failTestAt(msg: String, stackDepthAdjustment: Int): Nothing
 }

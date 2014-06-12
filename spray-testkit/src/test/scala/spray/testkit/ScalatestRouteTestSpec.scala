@@ -16,8 +16,8 @@
 
 package spray.testkit
 
-import org.scalatest.FreeSpec
-import org.scalatest.Matchers
+import org.scalatest._
+import exceptions.TestFailedException
 import akka.testkit.TestProbe
 import spray.routing.{ MethodRejection, RequestContext, Directives }
 import spray.http._
@@ -27,58 +27,103 @@ import HttpCharsets._
 import StatusCodes._
 import HttpHeaders._
 
-class ScalatestRouteTestSpec extends FreeSpec with Matchers with Directives with ScalatestRouteTest {
+class ScalatestRouteTestSpec extends FreeSpec with MustMatchers with Directives with ScalatestRouteTest {
 
-  "The ScalatestRouteTest should support" - {
+  "The ScalatestRouteTest must" - {
+    "support" - {
 
-    "the most simple and direct route test" in {
-      Get() ~> {
-        (_: RequestContext).complete(HttpResponse())
-      } ~> (_.response) shouldEqual HttpResponse()
-    }
-
-    "a test using a directive and some checks" in {
-      val pinkHeader = RawHeader("Fancy", "pink")
-      Get() ~> addHeader(pinkHeader) ~> {
-        respondWithHeader(pinkHeader) { complete("abc") }
-      } ~> check {
-        status shouldEqual OK
-        body shouldEqual HttpEntity(ContentType(`text/plain`, `UTF-8`), "abc")
-        header("Fancy") shouldEqual Some(pinkHeader)
+      "the most simple and direct route test" in {
+        Get() ~> {
+          (_: RequestContext).complete(HttpResponse())
+        } ~> (_.response) mustEqual HttpResponse()
       }
-    }
 
-    "proper rejection collection" in {
-      Post("/abc", "content") ~> {
-        (get | put) {
-          complete("naah")
-        }
-      } ~> check {
-        rejections shouldEqual List(MethodRejection(GET), MethodRejection(PUT))
-      }
-    }
-
-    "separate running route from checking" in {
-      val pinkHeader = RawHeader("Fancy", "pink")
-
-      case class HandleRequest(ctx: RequestContext)
-      val service = TestProbe()
-      val handler = TestProbe()
-
-      val result =
+      "a test using a directive and some checks" in {
+        val pinkHeader = RawHeader("Fancy", "pink")
         Get() ~> addHeader(pinkHeader) ~> {
-          respondWithHeader(pinkHeader) { ctx ⇒ service.send(handler.ref, HandleRequest(ctx)) }
-        } ~> runRoute
+          respondWithHeader(pinkHeader) { complete("abc") }
+        } ~> check {
+          status mustEqual OK
+          body mustEqual HttpEntity(ContentType(`text/plain`, `UTF-8`), "abc")
+          header("Fancy") mustEqual Some(pinkHeader)
+        }
+      }
 
-      val ctx = handler.expectMsgType[HandleRequest].ctx
-      ctx.complete("abc")
+      "proper rejection collection" in {
+        Post("/abc", "content") ~> {
+          (get | put) {
+            complete("naah")
+          }
+        } ~> check {
+          rejections mustEqual List(MethodRejection(GET), MethodRejection(PUT))
+        }
+      }
 
-      check {
-        status shouldEqual OK
-        body shouldEqual HttpEntity(ContentType(`text/plain`, `UTF-8`), "abc")
-        header("Fancy") shouldEqual Some(pinkHeader)
-      }(result)
+      "separate running route from checking" in {
+        val pinkHeader = RawHeader("Fancy", "pink")
+
+        case class HandleRequest(ctx: RequestContext)
+        val service = TestProbe()
+        val handler = TestProbe()
+
+        val result =
+          Get() ~> addHeader(pinkHeader) ~> {
+            respondWithHeader(pinkHeader) { ctx ⇒ service.send(handler.ref, HandleRequest(ctx)) }
+          } ~> runRoute
+
+        val ctx = handler.expectMsgType[HandleRequest].ctx
+        ctx.complete("abc")
+
+        check {
+          status mustEqual OK
+          body mustEqual HttpEntity(ContentType(`text/plain`, `UTF-8`), "abc")
+          header("Fancy") mustEqual Some(pinkHeader)
+        }(result)
+      }
+    }
+
+    "produce TestFailedExceptions with the proper stackdepth" - {
+
+      def thisLineNumber = {
+        val st = Thread.currentThread.getStackTrace
+
+        if (!st(2).getMethodName.contains("thisLineNumber"))
+          st(2).getLineNumber
+        else
+          st(3).getLineNumber
+      }
+
+      val testRoute =
+        path("testing") {
+          get {
+            respondWithMediaType(`text/html`) {
+              complete {
+                <html>
+                  <body>
+                    <h1>Testing 1, 2, 3</h1>
+                  </body>
+                </html>
+              }
+            }
+          }
+        }
+
+      "when an assertion fails" in {
+        the[TestFailedException] thrownBy {
+          Get("/testing") ~> testRoute ~> check {
+            responseAs[String] must include("2, 3, 4")
+          }
+        } must have('failedCodeLineNumber(Some(thisLineNumber - 2)))
+      }
+
+      "when a request is not handled" in {
+        the[TestFailedException] thrownBy {
+          Get("/testing123") ~> testRoute ~> check {
+            responseAs[String] must include("2, 3, 4")
+          }
+        } must have('failedCodeLineNumber(Some(thisLineNumber - 2)))
+      }
     }
   }
-
 }
+

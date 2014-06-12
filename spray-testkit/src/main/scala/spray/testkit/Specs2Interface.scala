@@ -21,11 +21,12 @@ import org.specs2.specification.{ FragmentsBuilder, SpecificationStructure, Frag
 
 trait Specs2Interface extends TestFrameworkInterface with SpecificationStructure {
 
-  def failTest(msg: String) = {
+  def failTest(msg: String): Nothing = {
     val trace = new Exception().getStackTrace.toList
     val fixedTrace = trace.drop(trace.indexWhere(_.getClassName.startsWith("org.specs2")) - 1)
     throw new FailureException(Failure(msg, stackTrace = fixedTrace))
   }
+  def failTestAt(msg: String, stackDepthAdjustment: Int): Nothing = failTest(msg)
 
   override def map(fs: ⇒ Fragments) = super.map(fs).add(Step(cleanUp()))
 }

@@ -28,6 +28,7 @@ import spray.http._
 trait RouteResultComponent {
 
   def failTest(msg: String): Nothing
+  def failTestAt(msg: String, stackDepthAdjustment: Int): Nothing
 
   /**
    * A receptacle for the response, rejections and potentially generated response chunks created by a route.
@@ -93,7 +94,7 @@ trait RouteResultComponent {
       _response.getOrElse {
         _rejections.foreach {
           RejectionHandler.applyTransformations(_) match {
-            case Nil ⇒ failTest("Request was not handled")
+            case Nil ⇒ failTestAt("Request was not handled", 2)
             case r   ⇒ failTest("Request was rejected with " + r)
           }
         }
