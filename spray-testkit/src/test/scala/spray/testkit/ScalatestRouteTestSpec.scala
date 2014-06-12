@@ -26,6 +26,8 @@ import MediaTypes._
 import HttpCharsets._
 import StatusCodes._
 import HttpHeaders._
+import akka.actor.ActorSystem
+import scala.concurrent.duration._
 
 class ScalatestRouteTestSpec extends FreeSpec with MustMatchers with Directives with ScalatestRouteTest {
 
@@ -106,7 +108,23 @@ class ScalatestRouteTestSpec extends FreeSpec with MustMatchers with Directives 
               }
             }
           }
-        }
+        } ~
+          path("slowpoke") {
+            get {
+              respondWithMediaType(`text/html`) {
+                complete {
+                  println("Before sleep")
+                  Thread.sleep(2000)
+                  println("After sleep")
+                  <html>
+                    <body>
+                      <h1>Slowpoke testing 1, 2, 3</h1>
+                    </body>
+                  </html>
+                }
+              }
+            }
+          }
 
       "when an assertion fails" in {
         the[TestFailedException] thrownBy {
@@ -143,8 +161,29 @@ class ScalatestRouteTestSpec extends FreeSpec with MustMatchers with Directives 
       }
 
       "when a route is completed/rejected more than once" is pending // saveResult method
+      /*
+      "when a route is completed/rejected more than once" in {
+          val x: spray.http.HttpRequest = Get("/testing")
+          val y: ScalatestRouteTestSpec.this.RouteResult = x ~> testRoute
+          val z: ScalatestRouteTestSpec.this.RouteResult = x ~> testRoute
+          y ~> check {
+            responseAs[String] must include("1, 2, 3")
+          }
+          z ~> check {
+            responseAs[String] must include("1, 2, 3")
+          }
+       }
+*/
 
       "when a request times out" is pending // failNotCompletedNotRejected method
+      /*
+      "when a request times out" in {
+        implicit def timeout(implicit system: ActorSystem) = RouteTestTimeout(1.millisecond)
+        Get("/slowpoke") ~> testRoute ~> check {
+          responseAs[String] must include("Slowpoke testing")
+        }
+      }
+*/
     }
   }
 }
